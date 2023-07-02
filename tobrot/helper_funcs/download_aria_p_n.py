@@ -33,25 +33,22 @@ from pyrogram import (
 )
 
 async def aria_start():
-    aria2_daemon_start_cmd = []
-    # start the daemon, aria2c command
-    aria2_daemon_start_cmd.append("aria2c")
-    aria2_daemon_start_cmd.append("--allow-overwrite=true")
-    aria2_daemon_start_cmd.append("--daemon=true")
-    # aria2_daemon_start_cmd.append(f"--dir={DOWNLOAD_LOCATION}")
-    # TODO: this does not work, need to investigate this.
-    # but for now, https://t.me/TrollVoiceBot?start=858
-    aria2_daemon_start_cmd.append("--enable-rpc")
-    aria2_daemon_start_cmd.append("--follow-torrent=mem")
-    aria2_daemon_start_cmd.append("--max-connection-per-server=10")
-    aria2_daemon_start_cmd.append("--min-split-size=10M")
-    aria2_daemon_start_cmd.append("--rpc-listen-all=false")
-    aria2_daemon_start_cmd.append(f"--rpc-listen-port={ARIA_TWO_STARTED_PORT}")
-    aria2_daemon_start_cmd.append("--rpc-max-request-size=1024M")
-    aria2_daemon_start_cmd.append("--seed-ratio=0.0")
-    aria2_daemon_start_cmd.append("--seed-time=1")
-    aria2_daemon_start_cmd.append("--max-overall-upload-limit=1K")
-    aria2_daemon_start_cmd.append("--split=10")
+    aria2_daemon_start_cmd = [
+        "aria2c",
+        "--allow-overwrite=true",
+        "--daemon=true",
+        "--enable-rpc",
+        "--follow-torrent=mem",
+        "--max-connection-per-server=10",
+        "--min-split-size=10M",
+        "--rpc-listen-all=false",
+        f"--rpc-listen-port={ARIA_TWO_STARTED_PORT}",
+        "--rpc-max-request-size=1024M",
+        "--seed-ratio=0.0",
+        "--seed-time=1",
+        "--max-overall-upload-limit=1K",
+        "--split=10",
+    ]
     #aria2_daemon_start_cmd.append(f"--bt-stop-timeout={MAX_TIME_TO_WAIT_FOR_TORRENTS_TO_START}")
     #
     LOGGER.info(aria2_daemon_start_cmd)
@@ -64,14 +61,11 @@ async def aria_start():
     stdout, stderr = await process.communicate()
     LOGGER.info(stdout)
     LOGGER.info(stderr)
-    aria2 = aria2p.API(
+    return aria2p.API(
         aria2p.Client(
-            host="http://localhost",
-            port=ARIA_TWO_STARTED_PORT,
-            secret=""
+            host="http://localhost", port=ARIA_TWO_STARTED_PORT, secret=""
         )
     )
-    return aria2
 
 
 def add_magnet(aria_instance, magnetic_link, c_file_name):
@@ -88,7 +82,7 @@ def add_magnet(aria_instance, magnetic_link, c_file_name):
     except Exception as e:
         return False, "**FAILED** \n" + str(e) + " \nPlease do not send SLOW links. Read /help"
     else:
-        return True, "" + download.gid + ""
+        return True, f"{download.gid}"
 
 
 def add_torrent(aria_instance, torrent_file_path):
@@ -106,7 +100,7 @@ def add_torrent(aria_instance, torrent_file_path):
         except Exception as e:
             return False, "**FAILED** \n" + str(e) + " \nPlease do not send SLOW links. Read /help"
         else:
-            return True, "" + download.gid + ""
+            return True, f"{download.gid}"
     else:
         return False, "**FAILED** \nPlease try other sources to get workable link"
 
@@ -127,7 +121,7 @@ def add_url(aria_instance, text_url, c_file_name):
     except Exception as e:
         return False, "**FAILED** \n" + str(e) + " \nPlease do not send SLOW links. Read /help"
     else:
-        return True, "" + download.gid + ""
+        return True, f"{download.gid}"
 
 
 async def call_apropriate_function(
@@ -428,7 +422,6 @@ async def check_progress_for_dl(aria2, gid, event, previous_message):
     try:
         file = aria2.get_download(gid)
         complete = file.is_complete
-        is_file = file.seeder
         if not complete:
             if not file.error_message:
                 msg = ""
@@ -442,6 +435,7 @@ async def check_progress_for_dl(aria2, gid, event, previous_message):
                     downloading_dir_name = str(file.name)
                 except:
                     pass
+                is_file = file.seeder
                 #
                 if is_file is None :
                    msgg = f"Conn: {file.connections} <b>|</b> GID: <code>{gid}</code>"
@@ -450,20 +444,13 @@ async def check_progress_for_dl(aria2, gid, event, previous_message):
                 msg = f"\n`{downloading_dir_name}`"
                 msg += f"\n<b>Speed</b>: {file.download_speed_string()}"
                 msg += f"\n<b>Status</b>: {file.progress_string()} <b>of</b> {file.total_length_string()} <b>|</b> {file.eta_string()} <b>|</b> {msgg}"
-                #msg += f"\nSize: {file.total_length_string()}"
-
-                #if is_file is None :
-                   #msg += f"\n<b>Conn:</b> {file.connections}, GID: <code>{gid}</code>"
-                #else :
-                   #msg += f"\n<b>Info:</b>[ P : {file.connections} | S : {file.num_seeders} ], GID: <code>{gid}</code>"
-
-                #msg += f"\nStatus: {file.status}"
-                #msg += f"\nETA: {file.eta_string()}"
-                #msg += f"\nGID: <code>{gid}</code>"
-                inline_keyboard = []
-                ikeyboard = []
-                ikeyboard.append(InlineKeyboardButton("Cancel 🚫", callback_data=(f"cancel {gid}").encode("UTF-8")))
-                inline_keyboard.append(ikeyboard)
+                ikeyboard = [
+                    InlineKeyboardButton(
+                        "Cancel 🚫",
+                        callback_data=(f"cancel {gid}").encode("UTF-8"),
+                    )
+                ]
+                inline_keyboard = [ikeyboard]
                 reply_markup = InlineKeyboardMarkup(inline_keyboard)
                 #msg += reply_markup
                 LOGGER.info(msg)
@@ -492,7 +479,7 @@ async def check_progress_for_dl(aria2, gid, event, previous_message):
             return False
         else:
             LOGGER.info(str(e))
-            await event.edit("<u>error</u> :\n`{}` \n\n#error".format(str(e)))
+            await event.edit(f"<u>error</u> :\n`{str(e)}` \n\n#error")
             return
 # https://github.com/jaskaranSM/UniBorg/blob/6d35cf452bce1204613929d4da7530058785b6b1/stdplugins/aria.py#L136-L164
 
@@ -504,5 +491,5 @@ async def check_metadata(aria2, gid):
         # https://t.me/c/1213160642/496
         return None
     new_gid = file.followed_by_ids[0]
-    LOGGER.info("Changing GID " + gid + " to " + new_gid)
+    LOGGER.info(f"Changing GID {gid} to {new_gid}")
     return new_gid
